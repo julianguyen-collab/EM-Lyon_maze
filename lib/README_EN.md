@@ -11,7 +11,7 @@ Open the HTML files in a desktop browser with Pointer Lock support. The examples
 | [Minimal border](examples/minimal-bord/index.html) | Calibration, an A3 outline, and mouse position. The page draws the outline itself. | `mouse-position-tracker.js` only |
 | [Minimal maze](examples/minimal-maze/index.html) | Calibration, two walls, and a finish area. The library handles drawing and collision detection. | All three classes in `src/` |
 | [Minimal calibration](examples/minimal-calibration/index.html) | Five readings, tracking diagnostics, JSON profiles, and a copyable JavaScript variable | `mouse-position-tracker.js` only |
-| [Multi-lab](examples/multi-lab/index.html) | Eight layouts, themes, an optional grid, calibration diagnostics, and an event log | Library scripts and separate application files |
+| [Multi-lab](examples/multi-lab/index.html) | Ten layouts, themes, an optional grid, calibration diagnostics, and an event log | Library scripts and separate application files |
 
 The minimal examples keep the integration code, configuration, and CSS in the HTML page. Set `widthCm` and `heightCm` in `size` to match your setup. The default start is at the center of the bottom edge. In `minimal-maze`, the two walls and the finish area are defined in `new Maze(...)`.
 
@@ -31,6 +31,8 @@ The [Multi-lab example](examples/multi-lab/index.html) starts with an **A3 portr
 | Pebble garden | A course around circular islands, with flower zones and a pond as the finish area | `examples/multi-lab/mazes/jardin.js` |
 | Orbital station | A room with two open airlocks, a central reactor, beacons, and an escape pod | `examples/multi-lab/mazes/station.js` |
 | MAZE 2 | 60 × 60 cm square layout from the PDF | `examples/multi-lab/mazes/maze-2.js` |
+| MAZE 2 · Chemins | Bands from the PDF with free tracking | `examples/multi-lab/mazes/maze-2-paths.js` |
+| MAZE 2 · Suivi sur chemins | Same network with tracking projected onto the nearest path | `examples/multi-lab/mazes/maze-2-paths.js` |
 
 Layouts can define their own dimensions. Missing dimensions use the defaults from `maze-config.js`. Switching layouts while paused clears the event log and retains the calibration and estimated position when the dimensions match. A change in dimensions requires a new calibration. The selector is disabled while tracking or while calibration is incomplete.
 
@@ -72,8 +74,8 @@ Properties starting with `_` are internal. Methods that read state or configurat
 
 - Geometry uses **centimeters**. The origin is the bottom-left corner, with X increasing to the right and Y increasing upward. Raw mouse units need calibration before they can be converted to centimeters.
 - The position is the reference point chosen on the mouse.
-- Tracking preserves the measured position even when it crosses a wall or falls between grid lines.
-- Each wall, obstacle, zone, and finish area needs a unique `id`. The `boundary:` prefix is reserved for the outer edges.
+- By default, tracking reports the measured position, including across walls and between grid lines.
+- Each wall, path, obstacle, zone, and finish area needs a unique `id`. The `boundary:` prefix is reserved for the outer edges.
 - Use the same dimensions for `MousePositionTracker` and `Maze`.
 
 ## Minimal integration
@@ -178,6 +180,26 @@ const maze = new Maze({
 });
 ```
 
+### Define a path network
+
+Each path is a polyline in centimeters. Each pair of consecutive points defines a segment.
+
+```js
+const maze = new Maze({
+  widthCm: 60,
+  heightCm: 60,
+  start: { x: 30, y: 0 },
+  paths: [
+    { id: 'corridor', points: [{ x: 30, y: 0 }, { x: 30, y: 15 }, { x: 42, y: 15 }] }
+  ],
+  snapToPath: true
+});
+```
+
+With `snapToPath: true`, `updatePosition` and `resetPosition` find the closest point across all path segments. Read `maze.getState().position` for the projected point, `rawPosition` for the measured point in centimeters, and `pathProjection` for projection details. The tracker supplies the measurement, and the renderer displays the projection after calibration. Equal distances use the first declared segment. A change of segment checks events at the projected point and skips the straight sweep between samples.
+
+### Walls, obstacles, and zones
+
 Rectangles use their bottom-left corner, width, and height. Circles use `center` and `radius`. A wall follows a line segment with a total thickness in cm and rounded ends. `Maze` creates four zero-thickness boundaries named `boundary:left`, `boundary:right`, `boundary:bottom`, and `boundary:top`.
 
 With `mouseRadiusCm: 0`, wall and obstacle checks use the reference point. A positive radius approximates the mouse body as a circle centered on that point. Choose the radius with the location of the reference point in mind. Zones, the finish area, and `outside` always use the reference point itself.
@@ -188,6 +210,7 @@ With `mouseRadiusCm: 0`, wall and obstacle checks use the reference point. A pos
 | `resetPosition(position = null)` | Sets or clears the reference position without checking a path or emitting events. Use after recentering. |
 | `getState()` | Returns the position, signed distances to the edges, `outside`, `nearBorder`, `cell`, contacts, and zones. |
 | `getDefinition()` | Returns a copy of the maze configuration. |
+| `projectToPath({x, y})` | Returns `{position, pathId, segmentIndex, distanceCm}` or `null` when there are no paths. |
 | `setGrid(grid)` | Changes the grid and emits `gridchange`. Pass `null` to disable it. |
 | `getCell(position)` | Returns zero-based `{column, row}`, or `null` if the grid is disabled or the point is outside the maze. |
 

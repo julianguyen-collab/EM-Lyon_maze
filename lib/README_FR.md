@@ -12,7 +12,7 @@ Ouvre l’une de ces pages dans un navigateur de bureau compatible avec Pointer 
 | [Minimal : bord seul](examples/minimal-bord/index.html) | Calibration, contour A3 et position ; dessin élémentaire dans le HTML | `mouse-position-tracker.js` uniquement |
 | [Minimal : maze simple](examples/minimal-maze/index.html) | Calibration, deux murs et arrivée ; dessin et collisions via les classes | Les trois classes de `src/` |
 | [Minimal : calibration](examples/minimal-calibration/index.html) | Cinq relevés, diagnostics de suivi, profils JSON et variable JavaScript à copier | `mouse-position-tracker.js` uniquement |
-| [Multi-lab](examples/multi-lab/index.html) | Catalogue de huit labyrinthes, thèmes, grille, diagnostics et journal | Classes et fichiers d’application séparés |
+| [Multi-lab](examples/multi-lab/index.html) | Catalogue de dix labyrinthes, thèmes, grille, diagnostics et journal | Classes et fichiers d’application séparés |
 
 Les exemples minimaux n’incluent ni fichier de configuration, ni CSS externe,
 ni script d’application supplémentaire : tout leur code d’intégration est visible
@@ -33,7 +33,7 @@ du bord inférieur, la calibration avec diagnostics et le suivi libre hors des l
 Il commence sans murs intérieurs, sans arrivée et sans grille. La case à cocher active
 une grille facultative de 9,9 × 7 cm, soit 3 colonnes et 6 lignes.
 
-Le sélecteur en haut de page propose huit exemples :
+Le sélecteur en haut de page propose dix exemples :
 
 | Exemple | Contenu | Fichier à modifier |
 | --- | --- | --- |
@@ -45,6 +45,8 @@ Le sélecteur en haut de page propose huit exemples :
 | Jardin des galets | Slalom entre des îlots circulaires, fleurs à visiter et bassin d’arrivée | `examples/multi-lab/mazes/jardin.js` |
 | Station orbitale | Chambre à deux sas ouverts, réacteur central, balises et capsule de secours | `examples/multi-lab/mazes/station.js` |
 | MAZE 2 | Plan carré de 60 × 60 cm issu du PDF | `examples/multi-lab/mazes/maze-2.js` |
+| MAZE 2 · Chemins | Bandes du PDF, position mesurée libre | `examples/multi-lab/mazes/maze-2-paths.js` |
+| MAZE 2 · Suivi sur chemins | Même réseau, position projetée au plus proche | `examples/multi-lab/mazes/maze-2-paths.js` |
 
 Chaque parcours peut définir ses dimensions dans sa configuration. Les dimensions manquantes
 reprennent les valeurs par défaut de `maze-config.js`. Changer de parcours en pause
@@ -83,7 +85,7 @@ physiquement placée au départ. Cliquer avec la souris risquerait de la déplac
 | `examples/minimal-calibration/index.html` | Page de calibration autonome avec diagnostics et profils partageables |
 | `examples/multi-lab/index.html` | Application complète avec sélecteur de labyrinthes |
 | `examples/multi-lab/maze-config.js` | Description du labyrinthe : dimensions, départ, murs, obstacles, zones, arrivée et grille optionnelle |
-| `examples/multi-lab/mazes/*.js` | Descriptions des six parcours prédéfinis |
+| `examples/multi-lab/mazes/*.js` | Descriptions des parcours prédéfinis |
 | `examples/multi-lab/app.js` | Liaison entre classes, boutons, raccourcis et diagnostics |
 | `examples/multi-lab/style.css` | Présentation de l’exemple |
 | `tests/classes.test.cjs` | Tests automatiques, exécutables avec Node.js |
@@ -99,8 +101,6 @@ avant `app.js`. La description reste ainsi séparée du code de l’interface et
 `maze-config.js` initialise également `MAZE_EXAMPLES`. Les fichiers `mazes/*.js` y ajoutent
 leurs définitions, puis `app.js` construit le sélecteur. Pour ajouter un exemple, reprendre
 un de ces fichiers et charger son script après `maze-config.js`, avant `app.js` dans la page.
-Les exemples doivent partager les dimensions de calibration. La description personnelle
-sert de base commune aux exemples ; leurs murs, obstacles, zones et arrivée sont remplacés.
 Elles ne demandent aucun framework. Les propriétés préfixées par `_` sont internes.
 Les méthodes de lecture renvoient des copies ; modifier une copie ne modifie pas la classe.
 
@@ -109,7 +109,7 @@ Les méthodes de lecture renvoient des copies ; modifier une copie ne modifie pa
 - Toutes les coordonnées géométriques sont en **cm** : origine au coin bas gauche,
   X vers la droite, Y vers le haut. Les unités souris ne sont pas des cm.
 - La position désigne le point de référence choisi, et non automatiquement le centre du boîtier.
-- Les positions ne sont ni bloquées par les murs, ni arrondies sur une grille.
+- Par défaut, le suivi affiche la position mesurée, y compris entre les lignes de grille et au-delà des murs.
 - Les objets doivent posséder un `id` unique. Le préfixe `boundary:` est réservé aux bords.
 - Les dimensions du tracker et de `Maze` doivent être identiques dans une même intégration.
 
@@ -230,6 +230,26 @@ const maze = new Maze({
 });
 ```
 
+### Décrire un réseau de chemins
+
+Chaque chemin est une polyligne en centimètres. Chaque paire de points consécutifs forme un segment.
+
+```js
+const maze = new Maze({
+  widthCm: 60,
+  heightCm: 60,
+  start: { x: 30, y: 0 },
+  paths: [
+    { id: 'couloir', points: [{ x: 30, y: 0 }, { x: 30, y: 15 }, { x: 42, y: 15 }] }
+  ],
+  snapToPath: true
+});
+```
+
+Avec `snapToPath: true`, `updatePosition` et `resetPosition` cherchent le point le plus proche sur tous les segments. Lis `maze.getState().position` pour la position projetée, `rawPosition` pour la mesure en cm et `pathProjection` pour le détail de la projection. Le tracker fournit la mesure et le rendu affiche la projection après calibration. En cas d’égalité, le premier segment déclaré l’emporte. Lors d’un changement de segment, les événements sont déterminés à la position projetée, sans analyser le déplacement en ligne droite entre les deux points.
+
+### Murs, obstacles et zones
+
 Les rectangles sont définis par leur coin inférieur gauche, largeur et hauteur.
 Les cercles utilisent `center` et `radius`. Un mur est un segment central avec une épaisseur
 totale en cm et des bouts arrondis (capsule). Les quatre bords extérieurs sont automatiques :
@@ -246,6 +266,7 @@ du boîtier ni décalage capteur/boîtier n’est modélisé. Les zones, l’arr
 | `resetPosition(position = null)` | Change la référence sans événement ni analyse du trajet ; à utiliser après recalage |
 | `getState()` | Position, distances signées aux bords, `outside`, `nearBorder`, `cell`, contacts et zones |
 | `getDefinition()` | Copie de la configuration géométrique |
+| `projectToPath({x, y})` | Projection `{position, pathId, segmentIndex, distanceCm}` ou `null` si aucun chemin |
 | `setGrid(grid)` | Active ou désactive la grille logique ; émet uniquement `gridchange` |
 | `getCell(position)` | `{column, row}` à partir de zéro, ou `null` hors rectangle / sans grille |
 

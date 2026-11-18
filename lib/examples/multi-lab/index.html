@@ -17,6 +17,7 @@
   <script defer src="mazes/jardin.js"></script>
   <script defer src="mazes/station.js"></script>
   <script defer src="mazes/maze-2.js"></script>
+  <script defer src="mazes/maze-2-paths.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
@@ -43,11 +44,11 @@
       <button id="home" disabled>Recaler au départ</button>
       <p id="status" role="status">Prêt pour la calibration.</p>
       <div class="diagnostics">
-        <p id="input-mode"></p><p id="raw-position"></p><p id="movement"></p>
+        <p id="input-mode"></p><p id="raw-position"></p><p id="path-projection" hidden></p><p id="movement"></p>
         <p id="target"></p><p id="edge-distances"></p><p id="quality"></p>
       </div>
       <p class="hint"><strong>Espace</strong> : valider un repère.<br><strong>Échap</strong> : pause.<br><strong>D</strong> : recaler au départ.</p>
-      <small>X vers la droite, Y vers le haut ; origine au coin bas gauche. Le point suivi reste libre, même au-delà des murs.</small>
+      <small>X vers la droite, Y vers le haut ; origine au coin bas gauche. Le mode de suivi est indiqué dans la description du parcours.</small>
     </section>
   </div>
   <section class="panel instructions">
