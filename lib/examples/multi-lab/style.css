@@ -18,5 +18,10 @@ table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { padding: 6px; text-align: left; border-bottom: 1px solid #dce3eb; }
 small, .hint { color: #516178; line-height: 1.6; }
 .instructions { margin-top: 24px; line-height: 1.6; }
+.profile-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 12px; }
+.profile-actions button { width: auto; }
+.profile-actions input { display: block; max-width: 100%; margin-top: 4px; font: inherit; }
+.profile-actions p { margin: 0; }
+#calibration-code { display: block; width: 100%; margin: 4px 0 8px; padding: 12px; border: 1px solid #bbc9da; border-radius: 8px; color: inherit; background: #f6f8fb; font: 14px/1.5 monospace; resize: vertical; }
 #events { max-height: 220px; overflow: auto; font-size: 14px; }
 @media(max-width: 760px) { .layout { grid-template-columns: 1fr; } canvas { height: 420px; } main { padding: 12px; } }

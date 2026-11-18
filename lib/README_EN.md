@@ -10,15 +10,16 @@ Open the HTML files in a desktop browser with Pointer Lock support. The examples
 | --- | --- | --- |
 | [Minimal border](examples/minimal-bord/index.html) | Calibration, an A3 outline, and mouse position. The page draws the outline itself. | `mouse-position-tracker.js` only |
 | [Minimal maze](examples/minimal-maze/index.html) | Calibration, two walls, and a finish area. The library handles drawing and collision detection. | All three classes in `src/` |
-| [Multi-lab](examples/multi-lab/index.html) | Seven layouts, themes, an optional grid, calibration diagnostics, and an event log | Library scripts and separate application files |
+| [Minimal calibration](examples/minimal-calibration/index.html) | Five readings, tracking diagnostics, JSON profiles, and a copyable JavaScript variable | `mouse-position-tracker.js` only |
+| [Multi-lab](examples/multi-lab/index.html) | Eight layouts, themes, an optional grid, calibration diagnostics, and an event log | Library scripts and separate application files |
 
-The two minimal examples keep the integration code, configuration, and CSS in the HTML page. Set `widthCm` and `heightCm` in `size` to match your setup. The default start is at the center of the bottom edge. In `minimal-maze`, the two walls and the finish area are defined in `new Maze(...)`.
+The minimal examples keep the integration code, configuration, and CSS in the HTML page. Set `widthCm` and `heightCm` in `size` to match your setup. The default start is at the center of the bottom edge. In `minimal-maze`, the two walls and the finish area are defined in `new Maze(...)`.
 
 Click to calibrate or resume. Press **Space** to record each of the five calibration points, **D** to recenter at the start, and **Esc** to pause.
 
 ### Multi-lab
 
-The [Multi-lab example](examples/multi-lab/index.html) uses an **A3 portrait layout (29.7 × 42 cm)**. The start is at the center of the bottom edge, and tracking continues outside the outline. The default layout has an empty interior. The checkbox enables a 9.9 × 7 cm grid with three columns and six rows.
+The [Multi-lab example](examples/multi-lab/index.html) starts with an **A3 portrait layout (29.7 × 42 cm)**. The start is at the center of the bottom edge, and tracking continues outside the outline. The default layout has an empty interior. The checkbox enables a 9.9 × 7 cm grid with three columns and six rows.
 
 | Layout | What it contains | File to edit |
 | --- | --- | --- |
@@ -29,8 +30,9 @@ The [Multi-lab example](examples/multi-lab/index.html) uses an **A3 portrait lay
 | Firefly spiral | A spiral wall, three glowing markers, and a finish area at the center | `examples/multi-lab/mazes/spirale.js` |
 | Pebble garden | A course around circular islands, with flower zones and a pond as the finish area | `examples/multi-lab/mazes/jardin.js` |
 | Orbital station | A room with two open airlocks, a central reactor, beacons, and an escape pod | `examples/multi-lab/mazes/station.js` |
+| MAZE 2 | 60 × 60 cm square layout from the PDF | `examples/multi-lab/mazes/maze-2.js` |
 
-All seven layouts use the same A3 dimensions. If you switch layouts while paused, the app keeps the calibration and estimated position and clears the event log. Switching layouts leaves the mouse position unchanged and generates no movement events. The selector is disabled while tracking or while calibration is incomplete.
+Layouts can define their own dimensions. Missing dimensions use the defaults from `maze-config.js`. Switching layouts while paused clears the event log and retains the calibration and estimated position when the dimensions match. A change in dimensions requires a new calibration. The selector is disabled while tracking or while calibration is incomplete.
 
 Choose a layout that matches the physical maze. If the mouse moved while tracking was off, put it back at the start and press **D**. Check that the mouse fits through the openings. The spiral corridors are about 3.5 cm wide and suit a tracked point or a small probe. You can visit zones in any order. The three themed layouts have their own colors and named markers, and the station’s airlocks are fixed openings.
 
@@ -38,7 +40,7 @@ Choose a layout that matches the physical maze. If the mouse moved while trackin
 2. Click **Calibrer les coins + retour** (Calibrate corners and return).
 3. Line up the same reference point with the bottom-left, bottom-right, top-right, and top-left corners, then return to the bottom-left corner. Press **Space** at each stop. Keep the mouse flat and facing the same direction.
 4. Check the corner errors and how far the estimated position drifted on the return. Provisional coordinates appear after the third point. Calibration completes after the fifth.
-5. Click **Reprendre le suivi** (Resume tracking), place the reference point at the start, and press **D**. The display should read X = 14.85 cm and Y = 0 cm.
+5. Click **Reprendre le suivi** (Resume tracking), place the reference point at the start, and press **D**. Check the starting coordinates shown in the calibration guide.
 6. Press **Esc** to release the pointer. If the mouse moves while tracking is off, recenter it at the start.
 
 To use the recenter button without moving the mouse, put the mouse at the start, focus the button with **Tab**, and press **Enter**.
@@ -52,6 +54,7 @@ To use the recenter button without moving the mouse, put the mouse at the start,
 | `src/maze-renderer.js` | `MazeRenderer` draws the maze and position on a canvas. |
 | `examples/minimal-bord/index.html` | Minimal example using the tracker alone. |
 | `examples/minimal-maze/index.html` | Minimal maze example using all three classes. |
+| `examples/minimal-calibration/index.html` | Standalone calibration example with diagnostics and shareable profiles. |
 | `examples/multi-lab/index.html` | Full example with a maze selector. |
 | `examples/multi-lab/maze-config.js` | Maze dimensions, start, walls, obstacles, zones, finish area, and optional grid. |
 | `examples/multi-lab/mazes/*.js` | Definitions for the six preset courses. |
@@ -123,16 +126,19 @@ Pass `widthCm` and `heightCm`. The optional `element` defaults to `document.body
 | `resume()` | Requests Pointer Lock and keeps the samples. Start or complete calibration first. |
 | `pause()` | Releases Pointer Lock and keeps the calibration. |
 | `recenter(position?)` | Sets the known position to `start` or a point in cm and keeps the scale. Requires completed calibration. |
+| `exportCalibration()` | Returns a completed calibration profile that can be serialized to JSON. |
+| `importCalibration(profile)` | Loads a profile while paused and waits for recentering before reporting the position. |
 | `getState()` | Returns a snapshot of the measurements and diagnostics. |
 | `destroy()` | Removes listeners and releases the pointer lock. It is safe to call more than once. |
 
 `startCalibration()` and `resume()` return a promise that resolves to a boolean. `true` means the request was sent without an immediate rejection. Use `statechange` and `state.locked` to confirm that the browser granted the lock, especially with older APIs. Browser errors are reported through the `error` event and `state.error`. Invalid calls, such as recentering before calibration, throw an error. `destroy()` ends the tracker’s lifecycle. Create a new tracker to start again.
 
-The tracker uses `EventTarget` events `positionchange`, `calibrationchange`, `statechange`, and `error`. `event.detail` contains a state snapshot and a `reason` such as `movement`, `recenter`, `start`, `capture`, `complete`, `lock`, or an error code. Use `statechange` to refresh the interface and `positionchange` to handle movements and recentering.
+The tracker uses `EventTarget` events `positionchange`, `calibrationchange`, `statechange`, and `error`. `event.detail` contains a state snapshot and a `reason` such as `movement`, `recenter`, `start`, `capture`, `complete`, `import`, `lock`, or an error code. Use `statechange` to refresh the interface and `positionchange` to handle movements and recentering.
 
 Main state fields
 
 - `position` is `{x, y}` or `null`. Status flags include `calibrated`, `calibrating`, `provisional`, `locked`, and `supported`.
+- `needsRecenter` means a loaded profile is waiting for recentering. `position` is `null` until then.
 - `raw`, `rawOffset`, and `delta` are the accumulated mouse signal, the signal relative to the first sample, and the last movement.
 - `inputMode` is `raw-requested`, `raw-unconfirmed`, or `standard`.
 - `error` is `null` or `{code, message}`.
@@ -141,6 +147,14 @@ Main state fields
 The first four points fit an affine transform by averaging opposite sides. Calibration rejects axes that are too close to parallel or corner measurements that differ too much from the expected layout. The fifth point is reserved for measuring drift. `closureCm` is the distance between the first and final readings. `warning` becomes `true` when drift exceeds 0.5 cm. This threshold is a guide.
 
 The tracker requests `unadjustedMovement: true` to bypass system mouse acceleration. If the browser returns `NotSupportedError`, the tracker clears the calibration and the next user click can start a new calibration in standard mode. Older APIs may ignore the option and report `raw-unconfirmed`.
+
+### Save and reuse a calibration
+
+Finish the five measurements in the [standalone calibration example](examples/minimal-calibration/index.html) or in Multi-lab. In **Profil de calibration**, use **Enregistrer le JSON** (Save JSON) or **Copier la variable** (Copy variable). Both examples accept the same profiles. To reuse a file in another session, select it with **Charger un fichier JSON** (Load a JSON file). Resume tracking, place the mouse at the start, and press **D**. In your own page, pass the copied variable to `tracker.importCalibration(calibration)` or pass the result of `JSON.parse()` to load a file.
+
+The JSON contains a version, dimensions, the input mode, and five calibration readings relative to the first corner. The tracker rebuilds the axes and diagnostics when you load it. The previous session’s position is discarded. The dimensions must match the maze. Recalibrate if the input mode changes.
+
+Reuse the profile with the same mouse, DPI, surface, and orientation. Check a known distance along each axis after recentering.
 
 ## Maze layout and events
 

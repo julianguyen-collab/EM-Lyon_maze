@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Multi-lab — catalogue de labyrinthes A3</title>
+  <title>Multi-lab — catalogue de labyrinthes</title>
   <link rel="stylesheet" href="style.css">
   <!-- Deferred classic scripts let this page run directly from disk. -->
   <script defer src="../../src/mouse-position-tracker.js"></script>
@@ -16,17 +16,18 @@
   <script defer src="mazes/spirale.js"></script>
   <script defer src="mazes/jardin.js"></script>
   <script defer src="mazes/station.js"></script>
+  <script defer src="mazes/maze-2.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
 <main>
-  <h1>Multi-lab · labyrinthes physiques A3</h1>
+  <h1>Multi-lab · labyrinthes physiques</h1>
   <p id="dimensions"></p>
   <section class="panel">
     <label for="maze-select">Exemple de labyrinthe</label>
     <select id="maze-select"></select>
     <p id="maze-description" class="hint"></p>
-    <small>Les exemples sont en A3 portrait. Le dessin choisi doit correspondre à ton montage physique. Échap permet de changer d’exemple ; la calibration est conservée.</small>
+    <small>Choisis le labyrinthe qui correspond à ton montage. Appuie sur Échap avant de changer de parcours. Recalibre la souris si les dimensions changent.</small>
   </section>
   <div class="layout">
     <section class="panel">
@@ -51,12 +52,30 @@
   </div>
   <section class="panel instructions">
     <h2>Calibration en cinq relevés</h2>
-    <p>Trace un rectangle de 29,7 × 42 cm. Choisis un point fixe sur la souris : capteur ou petit trait visible sur le boîtier. Utilise toujours ce même repère, y compris au départ.</p>
+    <p>Trace un contour de <span id="calibration-dimensions"></span>. Choisis un point fixe sur la souris : capteur ou petit trait visible sur le boîtier. Utilise toujours ce même repère, y compris au départ.</p>
     <p>Clique sur « Calibrer les coins + retour », puis aligne ton repère dans cet ordre : <strong>bas gauche → bas droit → haut droit → haut gauche → retour bas gauche</strong>. Valide chaque arrêt avec Espace. Ne soulève ni ne tourne la souris ; garde une vitesse proche de celle de l’utilisation.</p>
     <p>Les coordonnées deviennent provisoirement disponibles après le troisième relevé. Le retour au premier coin mesure la dérive, sans corriger artificiellement la calibration.</p>
-    <p>Après calibration, clique sur « Reprendre le suivi », place ton repère au départ, au milieu du bord inférieur, puis appuie sur <strong>D</strong>. Tu dois lire X = 14,85 cm et Y = 0 cm. Pour utiliser le bouton « Recaler au départ » sans bouger la souris, sélectionne-le au clavier avec Tab puis Entrée.</p>
+    <p>Après calibration, clique sur « Reprendre le suivi », place ton repère au départ indiqué sur le plan, puis appuie sur <strong>D</strong>. Tu dois lire <span id="start-coordinates"></span>. Pour utiliser le bouton « Recaler au départ » sans bouger la souris, sélectionne-le au clavier avec Tab puis Entrée.</p>
     <table><thead><tr><th>Repère</th><th>X estimé (cm)</th><th>Y estimé (cm)</th><th>Écart (cm)</th></tr></thead><tbody id="measurements"></tbody></table>
     <p class="hint">Une faible dérive au retour ne garantit pas la précision partout. Vérifie le centre et le haut à plusieurs vitesses. Après un changement de DPI, refais la calibration. Après un déplacement sans suivi ou un soulèvement, recale au départ.</p>
+  </section>
+  <section class="panel instructions">
+    <h2>Profil de calibration</h2>
+    <p>Réutilise le profil avec la même souris, les mêmes DPI, la même surface et la même orientation.</p>
+    <div class="profile-actions">
+      <button id="calibration-export" type="button" disabled>Enregistrer le JSON</button>
+      <div>
+        <label for="calibration-file">Charger un fichier JSON</label>
+        <input id="calibration-file" type="file" accept=".json,application/json">
+      </div>
+    </div>
+    <label for="calibration-code">Variable JavaScript</label>
+    <textarea id="calibration-code" rows="9" readonly spellcheck="false" placeholder="Disponible après une calibration complète ou le chargement d’un profil."></textarea>
+    <div class="profile-actions">
+      <button id="calibration-copy" type="button" disabled>Copier la variable</button>
+      <p id="calibration-profile-status" role="status"></p>
+    </div>
+    <p class="hint">Dans ton code, passe cette variable à <code>tracker.importCalibration(calibration)</code>.</p>
   </section>
   <section class="panel instructions">
     <h2>Événements du labyrinthe</h2>

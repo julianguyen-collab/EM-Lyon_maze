@@ -5,15 +5,16 @@ puis les interprète dans un labyrinthe. Il ne mesure pas une position absolue s
 
 ## Essayer l’exemple
 
-Trois pages complètes, ouvrables directement sans installation :
+Ouvre l’une de ces pages dans un navigateur de bureau compatible avec Pointer Lock.
 
 | Page | Usage | Scripts externes nécessaires |
 | --- | --- | --- |
 | [Minimal : bord seul](examples/minimal-bord/index.html) | Calibration, contour A3 et position ; dessin élémentaire dans le HTML | `mouse-position-tracker.js` uniquement |
 | [Minimal : maze simple](examples/minimal-maze/index.html) | Calibration, deux murs et arrivée ; dessin et collisions via les classes | Les trois classes de `src/` |
-| [Multi-lab](examples/multi-lab/index.html) | Catalogue de sept labyrinthes, thèmes, grille, diagnostics et journal | Classes et fichiers d’application séparés |
+| [Minimal : calibration](examples/minimal-calibration/index.html) | Cinq relevés, diagnostics de suivi, profils JSON et variable JavaScript à copier | `mouse-position-tracker.js` uniquement |
+| [Multi-lab](examples/multi-lab/index.html) | Catalogue de huit labyrinthes, thèmes, grille, diagnostics et journal | Classes et fichiers d’application séparés |
 
-Les deux exemples minimaux n’incluent ni fichier de configuration, ni CSS externe,
+Les exemples minimaux n’incluent ni fichier de configuration, ni CSS externe,
 ni script d’application supplémentaire : tout leur code d’intégration est visible
 dans leur page HTML. La seule dimension à régler est l’objet `size` (`widthCm`, `heightCm`).
 Le départ au milieu du bord inférieur est fourni par défaut. Dans `minimal-maze`,
@@ -27,12 +28,12 @@ Ouvrir **[examples/multi-lab/index.html](examples/multi-lab/index.html)** dans u
 compatible avec Pointer Lock. Les scripts classiques permettent une ouverture directe
 du fichier : aucun paquet à installer ni étape de compilation.
 
-L’exemple reprend le rectangle A3 portrait de **29,7 × 42 cm**, le départ au milieu
+Par défaut, l’exemple utilise le rectangle A3 portrait de **29,7 × 42 cm**, le départ au milieu
 du bord inférieur, la calibration avec diagnostics et le suivi libre hors des limites.
 Il commence sans murs intérieurs, sans arrivée et sans grille. La case à cocher active
 une grille facultative de 9,9 × 7 cm, soit 3 colonnes et 6 lignes.
 
-Le sélecteur en haut de page propose sept exemples :
+Le sélecteur en haut de page propose huit exemples :
 
 | Exemple | Contenu | Fichier à modifier |
 | --- | --- | --- |
@@ -43,9 +44,12 @@ Le sélecteur en haut de page propose sept exemples :
 | Spirale des lucioles | Une cloison enroulée, trois repères lumineux, arrivée au cœur ; ambiance nocturne | `examples/multi-lab/mazes/spirale.js` |
 | Jardin des galets | Slalom entre des îlots circulaires, fleurs à visiter et bassin d’arrivée | `examples/multi-lab/mazes/jardin.js` |
 | Station orbitale | Chambre à deux sas ouverts, réacteur central, balises et capsule de secours | `examples/multi-lab/mazes/station.js` |
+| MAZE 2 | Plan carré de 60 × 60 cm issu du PDF | `examples/multi-lab/mazes/maze-2.js` |
 
-Tous utilisent le même rectangle A3. Changer d’exemple en pause conserve la calibration
-et la position estimée, réinitialise le journal et ne simule aucun déplacement.
+Chaque parcours peut définir ses dimensions dans sa configuration. Les dimensions manquantes
+reprennent les valeurs par défaut de `maze-config.js`. Changer de parcours en pause
+réinitialise le journal et conserve la calibration et la position estimée si les dimensions
+sont identiques. Un changement de dimensions demande une nouvelle calibration.
 Le changement est désactivé pendant le suivi et pendant une calibration inachevée.
 Le dessin sélectionné doit correspondre au montage physique ; placer la souris au départ
 et utiliser D si elle a été déplacée sans suivi. Vérifier la largeur des passages par rapport
@@ -61,7 +65,7 @@ ont leur propre palette et des repères nommés ; leurs sas sont des passages fi
 4. Examiner les écarts et la dérive au retour. Les coordonnées sont provisoires après
    le troisième point ; la calibration n’est complète qu’après le cinquième.
 5. Cliquer sur **Reprendre le suivi**, placer le point choisi au départ, appuyer sur **D**.
-   L’affichage doit donner X = 14,85 cm, Y = 0 cm.
+   Vérifier les coordonnées du départ indiquées dans le guide de calibration.
 6. **Échap** libère le pointeur. Après tout déplacement non suivi, se recaler au départ.
 
 Le bouton de recalage peut être activé au clavier (Tab puis Entrée), une fois la souris
@@ -76,6 +80,7 @@ physiquement placée au départ. Cliquer avec la souris risquerait de la déplac
 | `src/maze-renderer.js` | Classe `MazeRenderer` : affichage canvas, sans modifier les mesures |
 | `examples/minimal-bord/index.html` | Exemple autonome : bord seul, un seul script inclus |
 | `examples/minimal-maze/index.html` | Exemple autonome : labyrinthe simple, trois classes incluses |
+| `examples/minimal-calibration/index.html` | Page de calibration autonome avec diagnostics et profils partageables |
 | `examples/multi-lab/index.html` | Application complète avec sélecteur de labyrinthes |
 | `examples/multi-lab/maze-config.js` | Description du labyrinthe : dimensions, départ, murs, obstacles, zones, arrivée et grille optionnelle |
 | `examples/multi-lab/mazes/*.js` | Descriptions des six parcours prédéfinis |
@@ -159,6 +164,8 @@ Utiliser un seul tracker par élément de verrouillage.
 | `resume()` | Demande le verrouillage et conserve les mesures ; calibration commencée ou complète requise |
 | `pause()` | Libère le pointeur sans effacer la calibration |
 | `recenter(position?)` | Recale sur `start` ou une position en cm, sans changer l’échelle ; calibration complète requise |
+| `exportCalibration()` | Renvoie un profil de calibration complet, sérialisable en JSON |
+| `importCalibration(profile)` | Charge un profil pendant la pause et attend un recalage avant de publier la position |
 | `getState()` | Renvoie un instantané de la mesure et de ses diagnostics |
 | `destroy()` | Retire les écouteurs et libère son verrouillage ; appel répétable |
 
@@ -170,12 +177,13 @@ calibration) lèvent une exception. Après `destroy()`, les commandes sont inter
 
 Événements `EventTarget` : `positionchange`, `calibrationchange`, `statechange`, `error`.
 Leur `event.detail` contient l’état et un champ `reason` : `movement`, `recenter`,
-`start`, `capture`, `complete`, `lock`, ou un code d’erreur. `statechange` permet
+`start`, `capture`, `complete`, `import`, `lock`, ou un code d’erreur. `statechange` permet
 de rafraîchir toute l’interface. `positionchange` concerne les mouvements et le recalage.
 
 Champs principaux de l’état :
 
 - `position` : `{x, y}` ou `null`, `calibrated`, `calibrating`, `provisional`, `locked`, `supported`.
+- `needsRecenter` indique qu’un profil a été chargé et attend un recalage. `position` vaut `null` jusque-là.
 - `raw`, `rawOffset`, `delta` : signal cumulé, relatif au premier relevé, dernier mouvement.
 - `inputMode` : `raw-requested`, `raw-unconfirmed` ou `standard`.
 - `error` : `null` ou `{code, message}`.
@@ -191,6 +199,14 @@ Le tracker demande `unadjustedMovement: true` pour éviter l’accélération sy
 Si le navigateur renvoie `NotSupportedError`, il invalide la calibration et demande
 un nouveau clic pour recommencer en mode standard. Il ne mélange pas les deux échelles.
 Une ancienne API peut ignorer l’option : le mode brut n’est alors pas confirmé.
+
+### Sauvegarder et réutiliser une calibration
+
+Termine les cinq relevés dans la [page de calibration autonome](examples/minimal-calibration/index.html) ou dans Multi-lab. Dans **Profil de calibration**, utilise **Enregistrer le JSON** ou **Copier la variable**. Les deux exemples acceptent les mêmes profils. Lors d’une autre séance, sélectionne le fichier avec **Charger un fichier JSON**. Reprends le suivi, place la souris au départ et appuie sur **D**. Si tu intègres la bibliothèque à une autre page, passe la variable copiée à `tracker.importCalibration(calibration)` ou transmets le résultat de `JSON.parse()` pour charger un fichier.
+
+Le JSON contient la version, les dimensions, le mode d’entrée et les cinq relevés de calibration relatifs au premier coin. Le tracker reconstruit les axes et les diagnostics au chargement. La position de la session précédente n’est pas enregistrée. Les dimensions doivent correspondre au labyrinthe. Si le mode d’entrée change, refais la calibration.
+
+Réutilise le profil avec la même souris, les mêmes DPI, la même surface et la même orientation. Vérifie une distance connue sur chaque axe après le recalage.
 
 ## Maze : description physique et événements
 

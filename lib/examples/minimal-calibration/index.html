@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Calibration de la souris</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f2f5f9; color: #17263b; font: 16px/1.5 system-ui, sans-serif; }
+    main { max-width: 800px; margin: auto; padding: 24px 16px; }
+    h1, h2, p { margin: 0 0 12px; }
+    h2 { font-size: 1.2rem; }
+    section { margin-top: 16px; padding: 18px; background: white; border: 1px solid #dce3eb; border-radius: 12px; }
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 12px 0; }
+    button, input { font: inherit; }
+    button { padding: 8px 12px; color: inherit; background: white; border: 1px solid #bbc9da; border-radius: 6px; }
+    button:enabled { cursor: pointer; }
+    button:disabled { opacity: .55; }
+    #calibrate { color: white; background: #185bd7; border-color: #185bd7; }
+    #status { padding: 10px; background: #edf3ff; border-radius: 6px; }
+    #coords { font-size: 1.25rem; font-weight: 650; }
+    dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 0; }
+    dt, .hint { font-size: .875rem; color: #516178; }
+    dd { margin: 2px 0 0; }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { padding: 6px; border-bottom: 1px solid #dce3eb; text-align: left; }
+    input[type="file"] { display: block; max-width: 100%; }
+    textarea { display: block; width: 100%; margin-top: 4px; padding: 10px; border: 1px solid #bbc9da; border-radius: 6px; background: #f6f8fb; font: .875rem/1.5 monospace; resize: vertical; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Calibration de la souris</h1>
+    <p>Rectangle A3 de 29,7 × 42 cm. L’origine est en bas à gauche. X va vers la droite et Y vers le haut.</p>
+
+    <section>
+      <h2>Suivi et diagnostics</h2>
+      <p>Choisis un repère sur la souris. Sans la soulever ni la tourner, place ce repère en bas à gauche, en bas à droite, en haut à droite, en haut à gauche, puis de nouveau en bas à gauche. Valide chaque point avec <kbd>Espace</kbd>.</p>
+      <div class="actions">
+        <button type="button" id="calibrate">Calibrer les cinq points</button>
+        <button type="button" id="resume" disabled>Reprendre le suivi</button>
+        <button type="button" id="home" disabled>Recaler au départ</button>
+      </div>
+      <p id="status" role="status"></p>
+      <p id="coords"></p>
+      <p class="hint"><kbd>Échap</kbd> met en pause. Pour reprendre après un déplacement sans suivi, place la souris au milieu du bord inférieur et appuie sur <kbd>D</kbd>.</p>
+      <dl>
+        <div><dt>Mode d’entrée</dt><dd id="input-mode"></dd></div>
+        <div><dt>Signal depuis le premier coin</dt><dd id="raw-position"></dd></div>
+        <div><dt>Dernier mouvement</dt><dd id="movement"></dd></div>
+        <div><dt>Échelle X / Y</dt><dd id="scale"></dd></div>
+        <div><dt>Écart maximal aux coins</dt><dd id="corner-error"></dd></div>
+        <div><dt>Dérive au retour</dt><dd id="closure"></dd></div>
+        <div><dt>Distances signées aux bords</dt><dd id="edge-distances"></dd></div>
+      </dl>
+    </section>
+
+    <section>
+      <h2>Relevés de calibration</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th scope="col">Repère</th><th scope="col">Cible X / Y (cm)</th><th scope="col">Mesure X / Y (cm)</th><th scope="col">Écart (cm)</th></tr></thead>
+          <tbody id="measurements"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Profil de calibration</h2>
+      <p>Le profil est compatible avec Multi-lab. Réutilise-le avec la même souris, les mêmes DPI, la même surface et la même orientation. Après le recalage, vérifie une distance connue sur chaque axe.</p>
+      <div class="actions">
+        <button type="button" id="calibration-export" disabled>Enregistrer le JSON</button>
+        <div>
+          <label for="calibration-file">Charger un fichier JSON</label>
+          <input id="calibration-file" type="file" accept=".json,application/json">
+        </div>
+      </div>
+      <label for="calibration-code">Variable JavaScript</label>
+      <textarea id="calibration-code" rows="9" readonly spellcheck="false" placeholder="Disponible après une calibration complète ou le chargement d’un profil."></textarea>
+      <div class="actions">
+        <button type="button" id="calibration-copy" disabled>Copier la variable</button>
+        <span id="profile-status" role="status"></span>
+      </div>
+      <p class="hint">Dans ton code, passe la variable à <code>tracker.importCalibration(calibration)</code>.</p>
+    </section>
+  </main>
+
+  <script src="../../src/mouse-position-tracker.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    const size = { widthCm: 29.7, heightCm: 42 };
+    const tracker = new MousePositionTracker(size);
+    const fileInput = $('calibration-file'), code = $('calibration-code'), profileStatus = $('profile-status');
+    const fmt = value => value == null ? '—' : value.toFixed(2);
+    const pair = point => `${fmt(point.x)} / ${fmt(point.y)}`;
+    const modeLabels = {
+      'raw-requested': 'Brut demandé',
+      'raw-unconfirmed': 'Brut non confirmé par le navigateur',
+      standard: 'Standard, accélération possible'
+    };
+    let json = '', readingProfile = false, commandError = '', frame = null;
+
+    function trackingStatus(s) {
+      if (!s.supported) return 'Ce navigateur ne prend pas en charge Pointer Lock.';
+      if (s.needsRecenter) {
+        return s.locked ? 'Place la souris au départ et appuie sur D.' : 'Profil chargé. Reprends le suivi, place la souris au départ et appuie sur D.';
+      }
+      if (s.calibrating) {
+        const { step, total, target } = s.calibration;
+        return `${s.locked ? '' : 'En pause. Reprends le suivi. '}Repère ${step}/${total} · ${target.name} (${pair(target)} cm). Valide avec Espace.`;
+      }
+      if (s.locked) return 'Suivi actif.';
+      return s.calibrated ? 'Calibration prête. Reprends le suivi et recale la souris au départ avec D.' : 'Clique sur Calibrer ou charge un profil JSON.';
+    }
+
+    function render() {
+      const s = tracker.getState(), p = s.position;
+      $('status').textContent = commandError || s.error?.message || trackingStatus(s);
+      $('coords').textContent = p ? `${s.provisional ? 'Provisoire · ' : ''}X ${fmt(p.x)} · Y ${fmt(p.y)} cm` : s.needsRecenter ? 'Recalage au départ requis.' : 'Position indisponible.';
+      $('input-mode').textContent = modeLabels[s.inputMode];
+      $('raw-position').textContent = `${pair(s.rawOffset)} unités souris`;
+      $('movement').textContent = `${pair(s.delta)} unités souris`;
+      $('edge-distances').textContent = p ? `Gauche ${fmt(p.x)} · droite ${fmt(size.widthCm - p.x)} · bas ${fmt(p.y)} · haut ${fmt(size.heightCm - p.y)} cm` : '—';
+      $('calibrate').disabled = !s.supported || s.locked || readingProfile;
+      $('resume').disabled = !s.supported || s.locked || readingProfile || (!s.calibrated && !s.calibrating);
+      $('home').disabled = !s.calibrated || s.locked || s.needsRecenter || readingProfile;
+      fileInput.disabled = s.locked || readingProfile;
+      $('calibration-export').disabled = !json || fileInput.disabled;
+      $('calibration-copy').disabled = !json || fileInput.disabled;
+    }
+
+    function renderCalibration({ calibrated, calibration: cal }) {
+      $('scale').textContent = cal.unitsPerCm ? `${pair(cal.unitsPerCm)} unités/cm` : '—';
+      $('corner-error').textContent = cal.maxCornerErrorCm == null ? '—' : `${fmt(cal.maxCornerErrorCm)} cm`;
+      $('closure').textContent = cal.closureCm == null ? '—' : `${fmt(cal.closureCm)} cm${cal.warning ? ' · écart important' : ''}`;
+      const rows = cal.marks.map((mark, i) => {
+        const entry = cal.measurements[i], row = document.createElement('tr');
+        for (const value of [mark.name, pair(mark), entry?.position ? pair(entry.position) : '—', fmt(entry?.errorCm)]) {
+          const cell = document.createElement('td');
+          cell.textContent = value;
+          row.append(cell);
+        }
+        return row;
+      });
+      $('measurements').replaceChildren(...rows);
+      json = calibrated ? JSON.stringify(tracker.exportCalibration(), null, 2) : '';
+      code.value = json ? `const calibration = ${json};` : '';
+    }
+
+    function schedule() {
+      if (frame !== null) return;
+      frame = requestAnimationFrame(() => { frame = null; render(); });
+    }
+
+    async function command(action) {
+      commandError = '';
+      try { await action(); }
+      catch (error) { commandError = error.message; }
+      schedule();
+    }
+
+    $('calibrate').addEventListener('click', () => {
+      profileStatus.textContent = '';
+      command(() => tracker.startCalibration());
+    });
+    $('resume').addEventListener('click', () => command(() => tracker.resume()));
+    $('home').addEventListener('click', () => command(() => tracker.recenter()));
+    document.addEventListener('keydown', e => {
+      const s = tracker.getState();
+      if (!s.locked || e.repeat) return;
+      if (e.code === 'Space' && s.calibrating) { e.preventDefault(); command(() => tracker.captureCalibrationPoint()); }
+      if (e.code === 'KeyD' && s.calibrated) command(() => tracker.recenter());
+    });
+
+    $('calibration-export').addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.href = `data:application/json;charset=utf-8,${encodeURIComponent(json)}`;
+      link.download = 'calibration.json';
+      link.click();
+    });
+
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      fileInput.value = '';
+      if (!file || readingProfile) return;
+      readingProfile = true;
+      render();
+      profileStatus.textContent = 'Lecture du profil…';
+      try {
+        let profile;
+        const contents = await file.text();
+        try { profile = JSON.parse(contents); }
+        catch { throw new Error('Le fichier ne contient pas un JSON valide.'); }
+        tracker.importCalibration(profile);
+        commandError = '';
+        profileStatus.textContent = 'Profil chargé.';
+      } catch (error) {
+        profileStatus.textContent = `Chargement impossible. ${error.message}`;
+      } finally {
+        readingProfile = false;
+        schedule();
+      }
+    });
+
+    $('calibration-copy').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(code.value);
+        profileStatus.textContent = 'Variable copiée.';
+      } catch {
+        code.focus();
+        code.select();
+        profileStatus.textContent = 'Variable sélectionnée. Appuie sur Ctrl+C ou Cmd+C.';
+      }
+    });
+
+    tracker.addEventListener('calibrationchange', ({ detail }) => renderCalibration(detail));
+    tracker.addEventListener('error', ({ detail }) => renderCalibration(detail));
+    tracker.addEventListener('statechange', schedule);
+    window.addEventListener('pagehide', e => { tracker.pause(); if (!e.persisted) tracker.destroy(); });
+    renderCalibration(tracker.getState());
+    render();
+  </script>
+</body>
+</html>
