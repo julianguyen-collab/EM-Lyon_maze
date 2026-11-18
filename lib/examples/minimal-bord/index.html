@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minimal — bord seul</title>
+  <style>
+    body { max-width: 640px; margin: 24px auto; padding: 0 16px; font: 16px system-ui; }
+    canvas { display: block; width: 100%; max-width: 400px; height: auto; background: #f4f6fa; }
+    button { padding: 10px; margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <h1>Minimal : bord seul</h1>
+  <p>A3 portrait · 29,7 × 42 cm. Un seul script inclus : le tracker. Le dessin est dans cette page.</p>
+  <button id="calibrate">Calibrer</button>
+  <button id="resume" disabled>Reprendre le suivi</button>
+  <p id="status" role="status"></p>
+  <p id="coords">Position non calibrée</p>
+  <canvas id="view" width="400" height="560" aria-label="Contour A3, départ vert et position estimée"></canvas>
+  <p>Aligne toujours le même repère sur la souris, sans la soulever ni la tourner.
+    Valide avec <strong>Espace</strong> : bas gauche → bas droit → haut droit → haut gauche → retour bas gauche.
+    Après calibration, reprends le suivi, place la souris au milieu du bord inférieur et appuie sur <strong>D</strong>.
+    <strong>Échap</strong> met en pause. Recale après tout déplacement sans suivi.</p>
+
+  <!-- The tracker handles calibration and movement on its own. -->
+  <script src="../../src/mouse-position-tracker.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    // Set the dimensions here. The default start is (width / 2, 0).
+    const size = { widthCm: 29.7, heightCm: 42 };
+    const tracker = new MousePositionTracker(size);
+    const canvas = $('view'), ctx = canvas.getContext('2d');
+
+    function render() {
+      const s = tracker.getState(), p = s.position, c = s.calibration;
+      $('calibrate').disabled = s.locked || !s.supported;
+      $('resume').disabled = s.locked || (!s.calibrated && !s.calibrating);
+      $('status').textContent = !s.supported ? 'Pointer Lock indisponible dans ce navigateur.' : s.error?.message ||
+        (s.calibrating ? `${s.locked ? '' : 'En pause. Reprends. '}Repère ${c.step}/5 : ${c.target.name}. Espace pour valider.` :
+          s.locked ? 'Suivi actif. D pour recaler au départ ; Échap pour libérer.' :
+          s.calibrated ? `Calibration terminée. Dérive : ${c.closureCm.toFixed(2)} cm. Reprends, place la souris au départ puis appuie sur D.` : 'Clique sur Calibrer.');
+      $('coords').textContent = p ? `${s.provisional ? 'Provisoire · ' : ''}X : ${p.x.toFixed(2)} | Y : ${p.y.toFixed(2)} cm` : 'Position non calibrée';
+
+      // Fit both the rectangle and the mouse position in the view.
+      const minX = Math.min(0, p?.x ?? 0), maxX = Math.max(size.widthCm, p?.x ?? 0);
+      const minY = Math.min(0, p?.y ?? 0), maxY = Math.max(size.heightCm, p?.y ?? 0);
+      const scale = Math.min(360 / (maxX - minX), 520 / (maxY - minY));
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, 400, 560);
+      ctx.setTransform(scale, 0, 0, -scale, 20 - minX * scale, 540 + minY * scale);
+      ctx.lineWidth = 2 / scale; ctx.strokeStyle = '#263b57'; ctx.strokeRect(0, 0, size.widthCm, size.heightCm);
+      const dot = (point, color) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(point.x, point.y, 5 / scale, 0, Math.PI * 2); ctx.fill(); };
+      dot(s.config.start, '#168352');
+      if (s.calibrating) dot(c.target, '#e58c13');
+      if (p) dot(p, p.x < 0 || p.y < 0 || p.x > size.widthCm || p.y > size.heightCm ? '#cb3030' : '#185bd7');
+    }
+    // Request Pointer Lock from a user click.
+    const showError = error => { $('status').textContent = error.message; };
+    $('calibrate').addEventListener('click', () => tracker.startCalibration().catch(showError));
+    $('resume').addEventListener('click', () => tracker.resume().catch(showError));
+    document.addEventListener('keydown', e => {
+      const s = tracker.getState();
+      if (!s.locked || e.repeat) return;
+      if (e.code === 'Space' && s.calibrating) { e.preventDefault(); tracker.captureCalibrationPoint(); }
+      if (e.code === 'KeyD' && s.calibrated) tracker.recenter();
+    });
+    tracker.addEventListener('statechange', render);
+    window.addEventListener('pagehide', e => { tracker.pause(); if (!e.persisted) tracker.destroy(); });
+    render();
+  </script>
+</body>
+</html>

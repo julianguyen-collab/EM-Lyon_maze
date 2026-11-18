@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minimal — labyrinthe simple</title>
+  <style>
+    body { max-width: 640px; margin: 24px auto; padding: 0 16px; font: 16px system-ui; }
+    canvas { display: block; width: 100%; height: 530px; background: #f4f6fa; }
+    button { padding: 10px; margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <h1>Minimal : labyrinthe simple</h1>
+  <p>Contourne le premier mur par la gauche, puis le second par la droite. Rejoins l’arrivée verte.</p>
+  <button id="calibrate">Calibrer</button>
+  <button id="resume" disabled>Reprendre le suivi</button>
+  <p id="status" role="status"></p>
+  <p id="coords">Position non calibrée</p>
+  <p id="event" role="status">Aucun événement.</p>
+  <canvas id="view" aria-label="Labyrinthe A3 avec deux murs, départ et arrivée"></canvas>
+  <p>Sans soulever ni tourner la souris, aligne toujours le même repère et valide chaque arrêt avec
+    <strong>Espace</strong> : bas gauche → bas droit → haut droit → haut gauche → retour bas gauche.
+    Après calibration, reprends le suivi, place la souris au milieu du bord inférieur et appuie sur <strong>D</strong>.
+    <strong>Échap</strong> met en pause. Recale après tout déplacement sans suivi.</p>
+
+  <!-- The tracker measures movement, Maze checks the layout, and the renderer draws it. -->
+  <script src="../../src/mouse-position-tracker.js"></script>
+  <script src="../../src/maze.js"></script>
+  <script src="../../src/maze-renderer.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    // The complete maze layout is defined here.
+    const size = { widthCm: 29.7, heightCm: 42 };
+    const tracker = new MousePositionTracker(size);
+    const maze = new Maze({
+      ...size,
+      walls: [
+        { id: 'mur-bas', from: { x: 8, y: 12 }, to: { x: 29.7, y: 12 }, thickness: 0.3 },
+        { id: 'mur-haut', from: { x: 0, y: 27 }, to: { x: 21.7, y: 27 }, thickness: 0.3 }
+      ],
+      finish: { id: 'arrivee', shape: 'rectangle', x: 10.85, y: 36, width: 8, height: 5 }
+    });
+    const renderer = new MazeRenderer($('view'), maze);
+
+    tracker.addEventListener('positionchange', ({ detail: s }) => {
+      if (!s.calibrated || s.provisional) return;
+      // After recentering, set the new reference position without checking a path.
+      if (s.reason === 'recenter') maze.resetPosition(s.position);
+      else maze.updatePosition(s.position);
+    });
+    tracker.addEventListener('calibrationchange', ({ detail: s }) => {
+      maze.resetPosition(s.calibrated ? s.position : null);
+      $('event').textContent = 'Aucun événement.';
+    });
+    tracker.addEventListener('error', ({ detail: s }) => { if (!s.calibrated) maze.resetPosition(); });
+    maze.addEventListener('wallcross', e => { $('event').textContent = `Franchissement estimé : ${e.detail.wallId}`; });
+    maze.addEventListener('wallenter', e => { $('event').textContent = `Contact estimé : ${e.detail.wallId}`; });
+    maze.addEventListener('finish', () => { $('event').textContent = 'Arrivée atteinte !'; });
+
+    function render() {
+      const s = tracker.getState(), p = s.position, c = s.calibration;
+      renderer.render(s);
+      $('calibrate').disabled = s.locked || !s.supported;
+      $('resume').disabled = s.locked || (!s.calibrated && !s.calibrating);
+      $('status').textContent = !s.supported ? 'Pointer Lock indisponible dans ce navigateur.' : s.error?.message ||
+        (s.calibrating ? `${s.locked ? '' : 'En pause. Reprends. '}Repère ${c.step}/5 : ${c.target.name}. Espace pour valider.` :
+          s.locked ? 'Suivi actif. D pour recaler au départ ; Échap pour libérer.' :
+          s.calibrated ? `Calibration terminée. Dérive : ${c.closureCm.toFixed(2)} cm. Reprends, place la souris au départ puis appuie sur D.` : 'Clique sur Calibrer.');
+      $('coords').textContent = p ? `${s.provisional ? 'Provisoire · ' : ''}X : ${p.x.toFixed(2)} | Y : ${p.y.toFixed(2)} cm` : 'Position non calibrée';
+    }
+    const showError = error => { $('status').textContent = error.message; };
+    $('calibrate').addEventListener('click', () => tracker.startCalibration().catch(showError));
+    $('resume').addEventListener('click', () => tracker.resume().catch(showError));
+    document.addEventListener('keydown', e => {
+      const s = tracker.getState();
+      if (!s.locked || e.repeat) return;
+      if (e.code === 'Space' && s.calibrating) { e.preventDefault(); tracker.captureCalibrationPoint(); }
+      if (e.code === 'KeyD' && s.calibrated) tracker.recenter();
+    });
+    tracker.addEventListener('statechange', render);
+    window.addEventListener('pagehide', e => {
+      tracker.pause(); if (!e.persisted) { tracker.destroy(); renderer.destroy(); }
+    });
+    render();
+  </script>
+</body>
+</html>
