@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Intro</title>
+  <style>
+    @font-face {
+      font-family: 'CreatoDisplay';
+      src: url('assets/fonts/CreatoDisplay-Bold.otf') format('opentype');
+      font-weight: bold;
+    }
+    :root {
+      color-scheme: dark;
+      font-family: 'CreatoDisplay', system-ui, sans-serif;
+      background: url('assets/imgs/bg.png') no-repeat center center fixed;
+      background-size: cover;
+    }
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .logo {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      padding: 30px;
+      transform: translateX(-50%);
+      height: clamp(48px, 8vw, 80px);
+      width: auto;
+      max-width: 100%;
+      object-fit: contain;
+    }
+    video {
+      position: fixed;
+      top: 150px;
+      max-width: 60%;
+      max-height: 60%;
+      border: 1px solid #4a6b4a;
+      border-radius: 12px;
+      object-fit: contain;
+    }
+    .controls {
+      position: fixed;
+      bottom: 65px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      justify-content: center;
+    }
+    button {
+      padding: 12px 24px;
+      font: inherit;
+      font-weight: bold;
+      background: #0a150a;
+      border: 1px solid #4a6b4a;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1.2rem;
+      color: #d0d0d0;
+    }
+    button:hover {
+      filter: brightness(1.2);
+    }
+  </style>
+</head>
+<body>
+  <img class="logo" src="assets/imgs/logo.png" alt="MAZE">
+  <video id="intro-video" src="assets/imgs/intro.mp4" autoplay controls></video>
+  <div class="controls">
+    <button id="btn-next">Next</button>
+  </div>
+  <script>
+    document.getElementById('btn-next').addEventListener('click', () => {
+      window.location.href = 'maze.html?view=demo';
+    });
+  </script>
+</body>
+</html>

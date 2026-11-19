@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MAIZE</title>
+  <style>
+    @font-face {
+      font-family: 'CreatoDisplay';
+      src: url('assets/fonts/CreatoDisplay-Bold.otf') format('opentype');
+      font-weight: bold;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Pricedown';
+      src: url('assets/fonts/Pricedown Bl.otf') format('opentype');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    :root {
+      color-scheme: dark;
+      --ink: #d0d0d0;
+      --muted: #d0d0d0;
+      --line: #4a6b4a;
+      --accent: #0a150a;
+      
+      font: 16px/1.5 'CreatoDisplay', system-ui, sans-serif;
+      color: var(--ink);
+      
+      background: url('assets/imgs/bg.png') no-repeat center center fixed;
+      background-size: cover;
+    }
+    * { box-sizing: border-box; }
+    body { 
+      margin: 0; 
+      background: transparent; 
+      min-height: 100dvh;
+    }
+    
+    main { 
+      width: min(1080px, 100%); 
+      margin: auto; 
+      padding: 28px 24px; 
+    }
+    
+    h1, h2, p { margin: 0; }
+    
+    h1 { 
+      font-family: 'Pricedown', system-ui, sans-serif;
+      font-size: clamp(2rem, 5vw, 3.25rem); 
+      line-height: 1.1; 
+      letter-spacing: -.045em; 
+      color: var(--ink);
+    }
+    h2 { font-size: 1.05rem; color: var(--ink); }
+    
+    .page-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas: "title title" "tracking view";
+      align-items: center;
+      gap: 12px;
+      padding: 8px 24px;
+      margin-bottom: 18px;
+    }
+
+    .page-header .logo {
+      grid-area: title;
+      display: block;
+      margin: 10px auto;
+      height: clamp(48px, 8vw, 80px);
+      width: auto;
+      max-width: 100%;
+      object-fit: contain;
+    }
+    
+    .header-actions {
+      grid-area: view;
+      display: flex;
+      gap: 8px;
+    }
+    .tracking-toolbar { grid-area: tracking; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 336px); gap: 18px; align-items: start; }
+    
+    .panel { 
+      border: 1px solid var(--line); 
+      border-radius: 16px; 
+      color: var(--ink);
+    }
+    .plan { overflow: hidden; }
+    canvas { display: block; width: 100%; aspect-ratio: 1; }
+    .controls { display: grid; gap: 14px; }
+    .controls[hidden], .console-panel[hidden] { display: none; }
+    .controls section { display: grid; gap: 12px; padding: 18px; }
+    .position { font-size: 1.15rem; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--ink); }
+    .hint { font-size: .875rem; color: var(--muted); }
+    #status { padding: 6px 10px; border-radius: 8px; background: #2a492a; color: var(--ink); font-size: .875rem; }
+    
+    button { 
+      padding: 10px 12px; 
+      border: 1px solid var(--line); 
+      border-radius: 8px; 
+      color: var(--ink); 
+      background: #081505; 
+      font: inherit; 
+      font-weight: 600; 
+      cursor: pointer;
+    }
+    button.primary { color: #ffffff; background: var(--accent); border-color: var(--accent); }
+    button:enabled:hover { filter: brightness(1.2); }
+    button:focus-visible { outline: 3px solid #4a6b4a; outline-offset: 2px; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    
+    .serial-field { display: grid; gap: 5px; font-size: .875rem; color: var(--ink); }
+    .serial-field input, .serial-field select { width: 100%; min-width: 0; color: var(--ink); font: inherit; background: #172b17; border: 1px solid var(--line); }
+    .serial-field select { border-radius: 8px; padding: 8px 10px; }
+    .serial-field input::file-selector-button { font: inherit; }
+    
+    .console-panel { margin-top: 18px; padding: 18px; }
+    .console-panel pre { 
+      max-height: 240px; 
+      overflow: auto; 
+      margin: 10px 0 0; 
+      padding: 12px; 
+      border-radius: 8px; 
+      background: #0a150a; 
+      color: #d0d0d0; 
+      font: .82rem/1.5 ui-monospace, monospace; 
+      white-space: pre-wrap; 
+      overflow-wrap: anywhere; 
+      border: 1px solid var(--line);
+    }
+    kbd { padding: 1px 4px; border: 1px solid var(--line); border-radius: 4px; font-size: .9em; color: var(--ink); }
+    
+    @media (max-width: 720px) {
+      main { padding: 18px 12px; }
+      .layout { grid-template-columns: 1fr; gap: 12px; }
+      .page-header { padding: 8px 12px; }
+      .header-actions { flex-direction: column; }
+    }
+    
+    main[data-view="demo"] {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100dvh;
+      padding: 8px;
+      overflow: hidden;
+    }
+    main[data-view="demo"] .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 24px;
+      background: transparent;
+      margin-bottom: 0;
+    }
+    main[data-view="demo"] .layout {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+    }
+    main[data-view="demo"] .plan {
+      max-width: 100%;
+      max-height: 100%;
+      aspect-ratio: 1;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }
+    main[data-view="demo"] canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    main[data-view="demo"] .page-header .logo { height: clamp(32px, 5vw, 56px); }
+    main[data-view="demo"] .page-header button { padding: 6px 10px; font-size: .875rem; }
+  </style>
+</head>
+<body>
+  <main id="app" data-view="configuration">
+    <header class="page-header">
+      <img class="logo" src="assets/imgs/logo.png" alt="MAZE">
+      <div class="tracking-toolbar">
+        <button id="resume" class="primary" type="button" disabled>Reprendre le suivi</button>
+        <p id="status" role="status">Recherche du fichier de calibration…</p>
+        <p id="pause-hint" class="hint" hidden><kbd>Échap</kbd> pour mettre en pause</p>
+      </div>
+      
+      <div class="header-actions">
+        <button id="btn-video" type="button">Vidéo</button>
+        <button id="view-toggle" type="button" aria-controls="configuration-panel console-panel" aria-expanded="true" aria-keyshortcuts="M" title="Basculer entre configuration et démo (M)">Mode démo</button>
+      </div>
+    </header>
+    
+    <div class="layout">
+      <div class="panel plan">
+        <canvas id="maze" aria-label="Les chemins de MAZE 2 et la position estimée">La position estimée est aussi affichée en texte.</canvas>
+      </div>
+      <div id="configuration-panel" class="controls">
+        <section class="panel" aria-labelledby="tracking-heading">
+          <h2 id="tracking-heading">Suivi sur les chemins</h2>
+          <p id="coords" class="position">Position indisponible.</p>
+          <p id="offset" class="hint" hidden></p>
+          <p class="hint">Place la souris au départ indiqué sur le plan, puis appuie sur <kbd>D</kbd> pour la recaler.</p>
+        </section>
+        <section class="panel" aria-labelledby="calibration-heading">
+          <h2 id="calibration-heading">Calibration</h2>
+          <p class="hint">Choisis un repère fixe sur la souris. Aligne-le sur les quatre coins indiqués, puis reviens au premier. Valide chaque relevé avec <kbd>Espace</kbd>.</p>
+          <button id="calibrate" type="button" disabled>Calibrer les cinq points</button>
+          <p id="calibration-quality" class="hint" hidden></p>
+          <button id="save-calibration" type="button" disabled>Enregistrer la calibration</button>
+          <p class="hint">Enregistre <code>calibration-maze-2.js</code> à côté de <code>index.html</code> pour le charger au prochain démarrage.</p>
+          <p id="profile-status" class="hint" role="status"></p>
+        </section>
+        <section class="panel" aria-labelledby="serial-heading">
+          <h2 id="serial-heading">Port COM et son</h2>
+          <label class="serial-field" for="baud-rate">
+            Débit (bauds)
+            <select id="baud-rate">
+              <option value="9600" selected>9 600</option>
+              <option value="19200">19 200</option>
+              <option value="38400">38 400</option>
+              <option value="57600">57 600</option>
+              <option value="115200">115 200</option>
+              <option value="230400">230 400</option>
+            </select>
+          </label>
+          <button id="serial-connect" type="button">Choisir le port COM</button>
+          <p id="serial-status" class="hint" role="status"></p>
+          <label class="serial-field" for="mp3-folder">
+            <span>Autre dossier MP3</span>
+            <input id="mp3-folder" type="file" webkitdirectory>
+          </label>
+          <button id="test-sound" type="button" disabled>Tester un son</button>
+          <p id="sound-status" class="hint" role="status"></p>
+          <audio id="press-sound" preload="none" hidden></audio>
+        </section>
+      </div>
+    </div>
+    <section id="console-panel" class="panel console-panel" aria-labelledby="console-heading">
+      <h2 id="console-heading">Journal de console</h2>
+      <pre id="console-output" tabindex="0" aria-label="Messages de la console">Aucun message.</pre>
+    </section>
+  </main>
+
+  <script src="assets/console-log.js"></script>
+  <script src="lib/src/mouse-position-tracker-2.js"></script>
+  <script src="lib/src/maze.js"></script>
+  <script src="lib/src/maze-renderer-2.js"></script>
+  <script src="lib/examples/multi-lab/mazes/maze-2.js"></script>
+  <script src="lib/examples/multi-lab/mazes/maze-2-paths.js"></script>
+  <script src="assets/mp3/playlist.js"></script>
+  <script src="assets/serial-audio.js"></script>
+  <script src="lib/src/mouse-position-tracker.js"></script>
+  <script>
+    (() => {
+      const $ = id => document.getElementById(id);
+      const profileFile = 'calibration-maze-2.js';
+      const config = { ...globalThis.MAZE_2_PATH_CONFIG, snapToPath: true, safeMarginCm: 1 };
+      const tracker = new MousePositionTracker(config);
+      const maze = new Maze(config);
+      const app = $('app'), canvas = $('maze'), viewToggle = $('view-toggle'), btnVideo = $('btn-video');
+      
+      const rendererOptions = {
+        ...globalThis.MAZE_2_PATH_VIEW,
+        theme: {
+          floor: '#081505',
+          wall: '#081505',
+          path: '#2a6a2a',
+          zone: '#1a3a1a',
+          finish: '#b6e4ca',
+          obstacle: '#bdbcbc',
+          text: '#ffffff',
+          zoneText: '#ffffff'
+        }
+      };
+      const renderer = new MazeRenderer(canvas, maze, rendererOptions);
+      
+      const controls = new AbortController();
+      const { signal } = controls;
+      const number = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const fmt = value => number.format(value);
+      let frame = null, commandError = '', loadingProfile = true, savingProfile = false;
+
+      function trackingStatus(state) {
+        if (loadingProfile) return 'Recherche du fichier de calibration…';
+        if (!state.supported) return 'Ce navigateur ne prend pas en charge le verrouillage du pointeur.';
+        if (state.calibrating) {
+          const { step, total, target } = state.calibration;
+          const action = state.locked ? 'Espace pour valider.' : 'Reprends le suivi pour continuer.';
+          return `Repère ${step}/${total} · ${target.name}. ${action}`;
+        }
+        if (state.needsRecenter) {
+          return state.locked
+            ? 'Place la souris au départ et appuie sur D.'
+            : 'Clique sur Reprendre le suivi, puis recale la souris au départ avec D.';
+        }
+        if (state.locked) return 'Suivi actif.';
+        return state.calibrated ? 'Reprends le suivi. Appuie sur D après avoir placé la souris au départ.' : 'Lance la calibration pour commencer.';
+      }
+
+      function render() {
+        const state = tracker.getState(), tracked = maze.getState();
+        renderer.render(state);
+        const message = commandError || state.error?.message || trackingStatus(state);
+        if ($('status').textContent !== message) $('status').textContent = message;
+        const position = state.provisional ? state.position : tracked?.position;
+        $('coords').textContent = position
+          ? `${state.provisional ? 'Provisoire · ' : ''}X ${fmt(position.x)} · Y ${fmt(position.y)} cm`
+          : 'Position indisponible.';
+        const offset = tracked?.pathProjection?.distanceCm;
+        $('offset').hidden = offset == null;
+        $('offset').textContent = offset == null ? '' : `Écart de la mesure au chemin · ${fmt(offset)} cm`;
+        const { closureCm, warning } = state.calibration;
+        $('calibration-quality').hidden = closureCm == null;
+        $('calibration-quality').textContent = closureCm == null ? '' : `Dérive au retour · ${fmt(closureCm)} cm${warning ? ' · écart important' : ''}`;
+        const busy = state.locked || loadingProfile || savingProfile;
+        $('calibrate').disabled = busy || !state.supported;
+        $('resume').disabled = busy || !state.supported || (!state.calibrated && !state.calibrating);
+        $('resume').hidden = state.locked;
+        $('pause-hint').hidden = !state.locked;
+        $('save-calibration').disabled = busy || !state.calibrated;
+      }
+
+      function schedule() {
+        if (frame !== null || signal.aborted) return;
+        frame = requestAnimationFrame(() => { frame = null; render(); });
+      }
+
+      function toggleView() {
+        const demo = app.dataset.view !== 'demo';
+        app.dataset.view = demo ? 'demo' : 'configuration';
+        $('configuration-panel').hidden = demo;
+        $('console-panel').hidden = demo;
+        viewToggle.textContent = demo ? 'Configuration' : 'Mode démo';
+        viewToggle.setAttribute('aria-expanded', String(!demo));
+        schedule();
+      }
+
+      async function command(action) {
+        commandError = '';
+        try { await action(); }
+        catch (error) { commandError = error.message; }
+        schedule();
+      }
+
+      btnVideo.addEventListener('click', () => {
+        window.location.href = 'video.html';
+      }, { signal });
+
+      async function saveCalibration() {
+        savingProfile = true;
+        $('profile-status').textContent = '';
+        render();
+        try {
+          const contents = `globalThis.MAZE_2_CALIBRATION = ${JSON.stringify(tracker.exportCalibration(), null, 2)};\n`;
+          let handle;
+          if (typeof window.showSaveFilePicker === 'function') {
+            try { handle = await window.showSaveFilePicker({ suggestedName: profileFile }); }
+            catch (error) {
+              if (error.name === 'AbortError') return;
+              if (!['SecurityError', 'NotAllowedError'].includes(error.name)) throw error;
+            }
+          }
+          if (handle) {
+            if (handle.name !== profileFile) throw new Error(`Enregistre le profil sous le nom ${profileFile}.`);
+            const stream = await handle.createWritable();
+            try {
+              await stream.write(contents);
+              await stream.close();
+            } catch (error) {
+              await stream.abort().catch(() => {});
+              throw error;
+            }
+            $('profile-status').textContent = `Profil enregistré dans ${profileFile}.`;
+          } else {
+            const link = document.createElement('a');
+            link.download = profileFile;
+            link.href = `data:text/javascript;charset=utf-8,${encodeURIComponent(contents)}`;
+            link.click();
+            $('profile-status').textContent = `Place le fichier téléchargé ${profileFile} à côté de index.html.`;
+          }
+        } catch (error) {
+          $('profile-status').textContent = `Échec de l’enregistrement. ${error.message}`;
+        } finally {
+          savingProfile = false;
+          schedule();
+        }
+      }
+
+      tracker.addEventListener('positionchange', ({ detail: state }) => {
+        if (!state.calibrated || state.provisional) return;
+        if (state.reason === 'recenter') maze.resetPosition(state.position);
+        else maze.updatePosition(state.position);
+      }, { signal });
+      tracker.addEventListener('calibrationchange', ({ detail: state }) => {
+        maze.resetPosition(state.calibrated ? state.position : null);
+        if (state.reason === 'start') $('profile-status').textContent = '';
+      }, { signal });
+      tracker.addEventListener('error', ({ detail: state }) => {
+        if (!state.calibrated) maze.resetPosition();
+      }, { signal });
+      tracker.addEventListener('statechange', schedule, { signal });
+      $('calibrate').addEventListener('click', () => command(() => tracker.startCalibration()), { signal });
+      $('resume').addEventListener('click', () => command(() => tracker.resume()), { signal });
+      $('save-calibration').addEventListener('click', saveCalibration, { signal });
+      viewToggle.addEventListener('click', toggleView, { signal });
+      canvas.addEventListener('click', () => {
+        if (app.dataset.view === 'demo' && !$('resume').disabled) command(() => tracker.resume());
+      }, { signal });
+      document.addEventListener('keydown', event => {
+        if (event.repeat) return;
+        const editing = event.target?.isContentEditable || event.target?.matches?.('input, select, textarea');
+        if (!editing && !event.altKey && !event.ctrlKey && !event.metaKey && event.key?.toLowerCase() === 'm') {
+          event.preventDefault();
+          toggleView();
+          return;
+        }
+        const state = tracker.getState();
+        if (!state.locked) return;
+        if (event.code === 'Space' && state.calibrating) {
+          event.preventDefault();
+          command(() => tracker.captureCalibrationPoint());
+        }
+        if (event.code === 'KeyD' && state.calibrated) command(() => tracker.recenter());
+      }, { signal });
+
+      const savedProfile = document.createElement('script');
+      savedProfile.src = profileFile;
+      savedProfile.addEventListener('load', () => {
+        try {
+          tracker.importCalibration(globalThis.MAZE_2_CALIBRATION);
+          $('profile-status').textContent = `Profil chargé depuis ${profileFile}.`;
+        } catch (error) {
+          $('profile-status').textContent = `Profil illisible. ${error.message}`;
+        }
+        loadingProfile = false;
+        schedule();
+      }, { once: true, signal });
+      savedProfile.addEventListener('error', () => {
+        loadingProfile = false;
+        schedule();
+      }, { once: true, signal });
+      document.head.append(savedProfile);
+      render();
+
+      if (new URLSearchParams(location.search).get('view') === 'demo') {
+        setTimeout(() => {
+          if (app.dataset.view !== 'demo') toggleView();
+        }, 0);
+      }
+
+      window.addEventListener('pagehide', event => {
+        tracker.pause();
+        if (event.persisted) return;
+        controls.abort();
+        tracker.destroy();
+        renderer.destroy();
+        if (frame !== null) cancelAnimationFrame(frame);
+      });
+    })();
+  </script>
+</body>
+</html>
